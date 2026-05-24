@@ -16,8 +16,8 @@ streamlit run streamlit_app.py
 
 ## 3) Use the detector
 
-1. Enter a Java source folder path (default: `sample_java_files`).
-   - For safety, the app only scans folders inside this project directory.
+1. Select a Java source folder from the dropdown (default: `sample_java_files`).
+   - For safety, only folders inside this project directory are available.
 2. Click **Run Detection**.
 3. Review findings in the dashboard table with highlighted smell badges.
 
