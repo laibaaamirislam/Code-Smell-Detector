@@ -30,28 +30,40 @@ project_root = Path(__file__).resolve().parent
 default_folder = str(project_root / "sample_java_files")
 folder_path = st.text_input("Java source folder path", value=default_folder)
 
+
+def resolve_scan_directory(input_path: str) -> Path:
+    raw_path = Path(input_path).expanduser()
+    candidate = raw_path.resolve() if raw_path.is_absolute() else (project_root / raw_path).resolve()
+    if not str(candidate).startswith(str(project_root)):
+        raise ValueError("Path must stay inside the project directory.")
+    return candidate
+
+
 if st.button("Run Detection", type="primary"):
-    target_path = Path(folder_path)
-
-    if not target_path.exists() or not target_path.is_dir():
-        st.error("Please provide a valid folder path.")
+    try:
+        target_path = resolve_scan_directory(folder_path)
+    except ValueError as exc:
+        st.error(str(exc))
     else:
-        with st.spinner("Analyzing Java files..."):
-            rows = detect_code_smells(str(target_path))
-
-        total = len(rows)
-        feature_envy = sum(1 for row in rows if row["Code Smell Type"] == "Feature Envy")
-        data_clumps = sum(1 for row in rows if row["Code Smell Type"] == "Data Clumps")
-
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Total Findings", total)
-        col2.metric("Feature Envy", feature_envy)
-        col3.metric("Data Clumps", data_clumps)
-
-        if not rows:
-            st.success("No smells were detected in the selected folder.")
+        if not target_path.exists() or not target_path.is_dir():
+            st.error("Please provide a valid folder path.")
         else:
-            st.subheader("Detection Results")
+            with st.spinner("Analyzing Java files..."):
+                rows = detect_code_smells(target_path)
+
+            total = len(rows)
+            feature_envy = sum(1 for row in rows if row["Code Smell Type"] == "Feature Envy")
+            data_clumps = sum(1 for row in rows if row["Code Smell Type"] == "Data Clumps")
+
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Total Findings", total)
+            col2.metric("Feature Envy", feature_envy)
+            col3.metric("Data Clumps", data_clumps)
+
+            if not rows:
+                st.success("No smells were detected in the selected folder.")
+            else:
+                st.subheader("Detection Results")
 
             def indicator(smell: str) -> str:
                 if smell == "Feature Envy":
@@ -60,15 +72,17 @@ if st.button("Run Detection", type="primary"):
                     return "🟠 Medium"
                 return "⚪ Info"
 
-            result_df = pd.DataFrame(rows)
-            result_df.insert(3, "Indicator", result_df["Code Smell Type"].map(indicator))
+                result_df = pd.DataFrame(rows)
+                result_df.insert(3, "Indicator", result_df["Code Smell Type"].map(indicator))
 
-            def style_smell(cell_value: str) -> str:
-                if "Feature Envy" in cell_value or "🔴" in cell_value:
-                    return "background-color: #fee2e2; color: #991b1b; font-weight: 600;"
-                if "Data Clumps" in cell_value or "🟠" in cell_value:
-                    return "background-color: #ffedd5; color: #9a3412; font-weight: 600;"
-                return ""
+            def style_rows(row):
+                if row["Code Smell Type"] == "Feature Envy":
+                    style = "background-color: #fee2e2; color: #991b1b; font-weight: 600;"
+                elif row["Code Smell Type"] == "Data Clumps":
+                    style = "background-color: #ffedd5; color: #9a3412; font-weight: 600;"
+                else:
+                    style = ""
+                return ["", "", style, style, ""]
 
-            styled = result_df.style.map(style_smell, subset=["Code Smell Type", "Indicator"])
-            st.dataframe(styled, use_container_width=True, hide_index=True)
+                styled = result_df.style.apply(style_rows, axis=1)
+                st.dataframe(styled, use_container_width=True, hide_index=True)

@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Dict, List, Set
 
 import javalang
+from javalang.parser import JavaSyntaxError
+from javalang.tokenizer import LexerError
 
 
 @dataclass
@@ -99,7 +101,11 @@ def _parse_java_file(file_path: Path) -> tuple[List[ClassInfo], List[SmellIssue]
                     external_targets[qualifier] = external_targets.get(qualifier, 0) + 1
 
             if external_interactions >= 3 and external_interactions > own_interactions:
-                target = max(external_targets, key=external_targets.get) if external_targets else "external object"
+                target = (
+                    max(external_targets, key=external_targets.__getitem__)
+                    if external_targets
+                    else "external object"
+                )
                 feature_envy_issues.append(
                     SmellIssue(
                         file_name=file_path.name,
@@ -149,8 +155,7 @@ def _detect_data_clumps(class_infos: List[ClassInfo]) -> List[SmellIssue]:
     return issues
 
 
-def detect_code_smells(directory_path: str) -> List[dict]:
-    directory = Path(directory_path)
+def detect_code_smells(directory: Path) -> List[dict]:
     java_files = sorted(directory.rglob("*.java"))
 
     class_infos: List[ClassInfo] = []
@@ -161,7 +166,7 @@ def detect_code_smells(directory_path: str) -> List[dict]:
             file_classes, file_issues = _parse_java_file(java_file)
             class_infos.extend(file_classes)
             issues.extend(file_issues)
-        except Exception as exc:  # pragma: no cover
+        except (JavaSyntaxError, LexerError, TypeError, OSError, UnicodeDecodeError) as exc:  # pragma: no cover
             issues.append(
                 SmellIssue(
                     file_name=java_file.name,
